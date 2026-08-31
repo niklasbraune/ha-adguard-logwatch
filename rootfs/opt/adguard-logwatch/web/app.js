@@ -28,12 +28,25 @@ function addRule(rule = {}) {
   const node = template.content.firstElementChild.cloneNode(true);
   node.dataset.id = rule.id || crypto.randomUUID();
   node.querySelector('.rule-name').value = rule.name || '';
+  node.querySelector('.rule-toggle-name').textContent = rule.name || 'Neue Regel';
   node.querySelector('.pattern').value = rule.pattern || '';
   node.querySelector('.match-type').value = rule.match_type || 'contains';
   node.querySelector('.clients').value = rule.clients || '';
   node.querySelector('.min-occurrences').value = rule.min_occurrences || 1;
   node.querySelector('.period-minutes').value = rule.period_minutes || 60;
   node.querySelector('.cooldown-minutes').value = rule.cooldown_minutes ?? 60;
+  node.querySelector('.notification-title').value = rule.notification?.title || '';
+  node.querySelector('.notification-message').value = rule.notification?.message || '';
+  const toggle = node.querySelector('.rule-toggle');
+  toggle.addEventListener('click', () => {
+    const expanded = node.classList.toggle('expanded');
+    toggle.setAttribute('aria-expanded', expanded);
+    toggle.title = expanded ? 'Regel schließen' : 'Regel öffnen';
+    node.querySelector('.rule-toggle-icon').textContent = expanded ? '−' : '+';
+  });
+  node.querySelector('.rule-name').addEventListener('input', event => {
+    node.querySelector('.rule-toggle-name').textContent = event.target.value || 'Neue Regel';
+  });
   for (const input of node.querySelectorAll('.statuses input')) input.checked = (rule.statuses || ['Blocked']).includes(input.value);
   node.querySelector('.remove').addEventListener('click', () => { node.remove(); setRuleCount(); });
   ruleList.append(node);
@@ -45,7 +58,8 @@ function readRules() {
     id: node.dataset.id, name: node.querySelector('.rule-name').value.trim(), pattern: node.querySelector('.pattern').value.trim(),
     match_type: node.querySelector('.match-type').value, statuses: [...node.querySelectorAll('.statuses input:checked')].map(input => input.value),
     clients: node.querySelector('.clients').value.trim(), min_occurrences: Number(node.querySelector('.min-occurrences').value),
-    period_minutes: Number(node.querySelector('.period-minutes').value), cooldown_minutes: Number(node.querySelector('.cooldown-minutes').value)
+    period_minutes: Number(node.querySelector('.period-minutes').value), cooldown_minutes: Number(node.querySelector('.cooldown-minutes').value),
+    notification: { title: node.querySelector('.notification-title').value.trim(), message: node.querySelector('.notification-message').value.trim() }
   }));
 }
 

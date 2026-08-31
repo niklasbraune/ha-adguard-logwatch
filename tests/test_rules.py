@@ -118,6 +118,17 @@ class RuleEvaluationTests(unittest.TestCase):
         self.assertEqual(payload["url"], ["https://ha.local"])
         self.assertEqual(request_open.call_args.kwargs["timeout"], 9)
 
+    def test_rule_can_customize_pushover_title_and_message(self):
+        self.app.STORE = self.app.Store()
+        rule = {
+            "id": "custom", "name": "Tracking", "period_minutes": 15,
+            "notification": {"title": "Alarm: {rule_name}", "message": "{count}/{threshold} in {period_minutes} Min.: {domains}"},
+        }
+        result = {"count": 2, "threshold": 1, "samples": [{"question": {"name": "ads.example.org"}}]}
+        with patch.object(self.app, "send_pushover", return_value=True) as pushover, patch.object(self.app, "send_home_assistant_event", return_value=False):
+            self.app.maybe_notify(rule, result)
+        pushover.assert_called_once_with("Alarm: Tracking", "2/1 in 15 Min.: ads.example.org", rule)
+
     def test_cooldown_is_persisted_across_store_reload(self):
         self.app.STORE = self.app.Store()
         rule = {"id": "cooldown", "name": "Cooldown", "period_minutes": 60, "cooldown_minutes": 60}

@@ -12,7 +12,7 @@ Home-Assistant-Add-on zur regelbasierten Auswertung des AdGuard-Home-Query-Logs.
 
 ## Regeln
 
-Eine Regel verbindet Suchmuster, Vergleichsart, optionale Clients, DNS-Status, Mindesttreffer und Zeitfenster. Bei einem Treffer wird das Home-Assistant-Event `adguard_logwatch_match` mit `rule`, `rule_id`, `count` und `threshold` versendet. Die Ruhezeit verhindert wiederholte Pushover-Meldungen.
+Eine Regel verbindet Suchmuster, Vergleichsart, optionale Clients, DNS-Status, Mindesttreffer und Zeitfenster. Für jede Regel können außerdem eine eigene Pushover-Überschrift und ein eigener Pushover-Text hinterlegt werden. Die Platzhalter `{count}`, `{threshold}`, `{period_minutes}`, `{domains}` und `{rule_name}` werden beim Versand ersetzt. Leere Felder verwenden die Standardmeldung. Bei einem Treffer wird das Home-Assistant-Event `adguard_logwatch_match` mit `rule`, `rule_id`, `count` und `threshold` versendet. Die Ruhezeit verhindert wiederholte Pushover-Meldungen.
 
 Die Konfiguration wird unter `/data/logwatch.json` gespeichert. Secrets werden im Browser nach dem Speichern maskiert und nicht ueber die Konfigurations-API ausgegeben.
 

@@ -250,17 +250,33 @@ def evaluate(notify=False):
     return results
 
 
+def notification_text(rule, result):
+    domains = ", ".join(entry.get("question", {}).get("name", "?") for entry in result["samples"][:3])
+    values = {
+        "count": result["count"],
+        "threshold": result["threshold"],
+        "period_minutes": rule.get("period_minutes", 60),
+        "domains": domains,
+        "rule_name": rule["name"],
+    }
+    default_message = f"{result['count']} Treffer in {rule.get('period_minutes', 60)} Min. {domains}"
+    notification = rule.get("notification", {})
+    title = notification.get("title") or rule["name"]
+    message = notification.get("message") or default_message
+    replace = lambda template: re.sub(r"\{([a-z_]+)\}", lambda match: str(values.get(match.group(1), match.group(0))), template)
+    return replace(title), replace(message)
+
+
 def maybe_notify(rule, result):
     cooldown = int(rule.get("cooldown_minutes", 60))
     with STORE.lock:
         last = parse_time(STORE.state["notifications"].get(rule["id"]))
     if last and now_utc() - last < timedelta(minutes=cooldown):
         return
-    domains = ", ".join(entry.get("question", {}).get("name", "?") for entry in result["samples"][:3])
-    message = f"{result['count']} Treffer in {rule.get('period_minutes', 60)} Min. {domains}"
+    title, message = notification_text(rule, result)
     delivered = False
     try:
-        delivered = send_pushover(rule["name"], message, rule) or delivered
+        delivered = send_pushover(title, message, rule) or delivered
     except RuntimeError as error:
         LOG.error("Pushover-Benachrichtigung fehlgeschlagen: %s", error)
     delivered = send_home_assistant_event(rule, result) or delivered
