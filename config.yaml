@@ -1,6 +1,6 @@
 name: AdGuard Log Watch
 slug: adguard_logwatch
-version: "0.1.0"
+version: "0.1.1"
 description: Auswertung des AdGuard-Query-Logs mit Regeln und Pushover-Benachrichtigungen
 url: "https://github.com/niklasbraune/ha-adguard-logwatch"
 arch:
