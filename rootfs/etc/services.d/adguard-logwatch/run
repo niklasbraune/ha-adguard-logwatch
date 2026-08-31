@@ -1,0 +1,2 @@
+#!/usr/bin/with-contenv /bin/sh
+exec python3 /opt/adguard-logwatch/app.py

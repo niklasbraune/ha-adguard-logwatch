@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AdGuard Log Watch</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header><div><p class="eyebrow">Home Assistant Add-on</p><h1>AdGuard Log Watch</h1></div><div id="connection" class="badge" aria-live="polite">Wird geladen</div></header>
+  <main>
+    <section class="status-bar" aria-label="Überwachungsstatus"><div><span>Letzter Lauf</span><strong id="last-run">Noch nie</strong></div><div><span>Aktive Treffer</span><strong id="active-matches">0</strong></div><div><span>Fehler</span><strong id="last-error">Keine</strong></div><button id="run-test" class="secondary">Jetzt auswerten</button></section>
+    <section class="layout">
+      <form id="settings" class="settings">
+        <div class="section-title"><h2>Verbindung</h2><p>AdGuard Home</p></div>
+        <label>URL<input name="adguard_url" type="url" placeholder="http://192.168.1.2:3000" required></label>
+        <div class="two-col"><label>Benutzername<input name="username" autocomplete="username"></label><label>Passwort<input name="password" type="password" autocomplete="current-password"></label></div>
+        <label>Intervall (Minuten)<input name="monitor_interval" type="number" min="1" max="60" required></label>
+        <div class="section-title"><h2>Pushover</h2><p>Optional</p></div>
+        <label>Application Token<input name="pushover_token" type="password"></label>
+        <div class="two-col"><label>User Key<input name="pushover_user" type="password"></label><label>Gerät<input name="pushover_device" placeholder="Alle Geräte"></label></div>
+        <div class="two-col"><label>Priorität<select name="pushover_priority"><option value="-2">Sehr niedrig</option><option value="-1">Niedrig</option><option value="0">Normal</option><option value="1">Hoch</option></select></label><label>Sound<input name="pushover_sound" placeholder="Standard"></label></div>
+        <div class="two-col"><label>Link<input name="pushover_url" type="url" placeholder="https://..."></label><label>Link-Titel<input name="pushover_url_title" placeholder="Details öffnen"></label></div>
+        <div class="actions"><button type="submit">Speichern</button><button type="button" id="pushover-test" class="secondary">Pushover testen</button></div>
+      </form>
+      <section class="rules"><div class="section-title"><div><h2>Überwachungsregeln</h2><p id="rule-count">0 Regeln</p></div><button id="add-rule" class="icon" title="Regel hinzufügen" aria-label="Regel hinzufügen">+</button></div><div id="rule-list"></div><button id="add-first-rule" type="button" class="add-first-rule">Erste Regel anlegen</button></section>
+    </section>
+    <section class="results"><div class="section-title"><h2>Letzte Auswertung</h2><p id="result-time"></p></div><div id="results-list" class="result-list"><p class="empty">Noch keine Daten vorhanden.</p></div></section>
+  </main>
+  <template id="rule-template"><article class="rule"><div class="rule-head"><input class="rule-name" placeholder="Regelname" required aria-label="Regelname"><button type="button" class="remove icon" title="Regel entfernen" aria-label="Regel entfernen">×</button></div><div class="rule-grid"><label>Suchmuster<input class="pattern" placeholder="doubleclick.net" required></label><label>Vergleich<select class="match-type"><option value="contains">Enthält</option><option value="suffix">Domain-Endung</option><option value="regex">Regulärer Ausdruck</option></select></label><fieldset class="statuses"><legend>Status</legend><label><input value="Blocked" type="checkbox" checked> Blockiert</label><label><input value="Allowed" type="checkbox"> Erlaubt</label></fieldset><label>Clients (CSV)<input class="clients" placeholder="192.168.1.50"></label><label>Treffer mindestens<input class="min-occurrences" type="number" min="1" value="1"></label><label>Zeitraum (Min.)<input class="period-minutes" type="number" min="1" value="60"></label><label>Ruhezeit (Min.)<input class="cooldown-minutes" type="number" min="0" value="60"></label></div></article></template>
+  <div id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
