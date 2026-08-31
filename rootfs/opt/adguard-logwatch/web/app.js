@@ -6,6 +6,16 @@ let config = {};
 const toast = (message) => { const node = document.querySelector('#toast'); node.textContent = message; node.classList.add('show'); setTimeout(() => node.classList.remove('show'), 3200); };
 const request = async (url, options = {}) => { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Anfrage fehlgeschlagen'); return data; };
 const setRuleCount = () => { const count = ruleList.children.length; document.querySelector('#rule-count').textContent = `${count} ${count === 1 ? 'Regel' : 'Regeln'}`; document.querySelector('#add-first-rule').hidden = count > 0; };
+const themeToggle = document.querySelector('#theme-toggle');
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('theme', theme);
+  const nextTheme = theme === 'dark' ? 'Hellmodus' : 'Dunkelmodus';
+  themeToggle.querySelector('span').textContent = nextTheme === 'Hellmodus' ? 'Hell' : 'Dunkel';
+  themeToggle.setAttribute('aria-label', `Zum ${nextTheme} wechseln`);
+  themeToggle.title = `Zum ${nextTheme} wechseln`;
+}
 
 async function withBusy(button, action) {
   const label = button.textContent;
@@ -65,6 +75,8 @@ async function initialize() {
 
 document.querySelector('#add-rule').addEventListener('click', () => addRule());
 document.querySelector('#add-first-rule').addEventListener('click', () => addRule());
+themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+setTheme(document.documentElement.dataset.theme || 'dark');
 form.addEventListener('submit', async event => { event.preventDefault(); const data = Object.fromEntries(new FormData(form)); data.monitor_interval = Number(data.monitor_interval); data.pushover_priority = Number(data.pushover_priority); data.rules = readRules(); try { await request('api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); toast('Konfiguration gespeichert.'); } catch (error) { toast(error.message); } });
 document.querySelector('#run-test').addEventListener('click', async event => { try { await withBusy(event.currentTarget, async () => { const data = await request('api/test', { method: 'POST' }); renderResults(data.results); await refreshStatus(); toast('Auswertung abgeschlossen.'); }); } catch (error) { toast(error.message); } });
 document.querySelector('#pushover-test').addEventListener('click', async event => { try { await withBusy(event.currentTarget, async () => { await request('api/pushover-test', { method: 'POST' }); toast('Test wurde an Pushover gesendet.'); }); } catch (error) { toast(error.message); } });

@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AdGuard Log Watch</title>
   <link rel="stylesheet" href="app.css">
+  <script>document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark';</script>
 </head>
 <body>
-  <header><div><p class="eyebrow">Home Assistant Add-on</p><h1>AdGuard Log Watch</h1></div><div id="connection" class="badge" aria-live="polite">Wird geladen</div></header>
+  <header><div><p class="eyebrow">Home Assistant Add-on</p><h1>AdGuard Log Watch</h1></div><div class="header-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Zum Hellmodus wechseln" title="Zum Hellmodus wechseln"><span aria-hidden="true">Hell</span></button><div id="connection" class="badge" aria-live="polite">Wird geladen</div></div></header>
   <main>
     <section class="status-bar" aria-label="Überwachungsstatus"><div><span>Letzter Lauf</span><strong id="last-run">Noch nie</strong></div><div><span>Aktive Treffer</span><strong id="active-matches">0</strong></div><div><span>Fehler</span><strong id="last-error">Keine</strong></div><button id="run-test" class="secondary">Jetzt auswerten</button></section>
     <section class="layout">
