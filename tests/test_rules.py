@@ -78,6 +78,32 @@ class RuleEvaluationTests(unittest.TestCase):
         self.assertEqual(results[0]["count"], 2)
         self.assertTrue(results[0]["matched"])
 
+    def test_evaluate_records_new_hit_and_pushover_status_once(self):
+        self.app.STORE = self.app.Store()
+        rule = {"id": "history", "name": "History", "pattern": "example.org", "min_occurrences": 1, "period_minutes": 60, "cooldown_minutes": 60}
+        self.app.STORE.config.update({"rules": [rule], "pushover_token": "token", "pushover_user": "user"})
+        entry = {"time": self.app.now_utc().isoformat(), "status": "Blocked", "client": "192.168.1.2", "question": {"name": "ads.example.org"}}
+        with patch.object(self.app, "adguard_query", return_value=[entry]), patch.object(self.app, "send_pushover", return_value=True) as pushover, patch.object(self.app, "send_home_assistant_event", return_value=False):
+            self.app.evaluate(notify=True)
+            self.app.evaluate(notify=True)
+        pushover.assert_called_once()
+        self.app.STORE = self.app.Store()
+        history = [event for event in self.app.STORE.state["history"] if event["rule_id"] == "history"]
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["rule_name"], "History")
+        self.assertEqual(history[0]["push_status"], "sent")
+        self.assertIsNotNone(history[0]["push_sent_at"])
+
+    def test_evaluate_records_hit_below_threshold_without_sending(self):
+        self.app.STORE = self.app.Store()
+        rule = {"id": "below", "name": "Below", "pattern": "example.org", "min_occurrences": 2, "period_minutes": 60}
+        self.app.STORE.config.update({"rules": [rule]})
+        entry = {"time": self.app.now_utc().isoformat(), "status": "Blocked", "question": {"name": "ads.example.org"}}
+        with patch.object(self.app, "adguard_query", return_value=[entry]), patch.object(self.app, "send_pushover") as pushover:
+            self.app.evaluate(notify=True)
+        self.assertEqual(self.app.STORE.state["history"][0]["push_status"], "below_threshold")
+        pushover.assert_not_called()
+
     def test_query_log_uses_older_than_until_cutoff(self):
         self.app.STORE.config.update({
             "adguard_url": "http://adguard.local:3000", "username": "admin", "password": "secret",

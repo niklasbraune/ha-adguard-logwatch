@@ -59,7 +59,7 @@ class Store:
     def __init__(self):
         self.lock = threading.Lock()
         self.config = DEFAULT_CONFIG.copy()
-        self.state = {"last_run": None, "last_error": None, "last_results": [], "notifications": {}, "pushover_notifications": {}}
+        self.state = {"last_run": None, "last_error": None, "last_results": [], "notifications": {}, "pushover_notifications": {}, "history": [], "history_cursors": {}}
         self.load()
 
     def load(self):
@@ -82,6 +82,8 @@ class Store:
                 saved = json.loads(STATE_PATH.read_text(encoding="utf-8"))
                 self.state["notifications"] = saved.get("notifications", {})
                 self.state["pushover_notifications"] = saved.get("pushover_notifications", {})
+                self.state["history"] = saved.get("history", [])
+                self.state["history_cursors"] = saved.get("history_cursors", {})
             except (OSError, json.JSONDecodeError):
                 LOG.warning("Benachrichtigungsstatus konnte nicht geladen werden")
 
@@ -90,8 +92,43 @@ class Store:
         temporary_path.write_text(json.dumps({
             "notifications": self.state["notifications"],
             "pushover_notifications": self.state["pushover_notifications"],
+            "history": self.state["history"],
+            "history_cursors": self.state["history_cursors"],
         }), encoding="utf-8")
         temporary_path.replace(STATE_PATH)
+
+    def record_history(self, rule, hit, count, threshold, checked_at, push_status):
+        rule_id = rule["id"]
+        hit_at = hit["time"]
+        hit_time = parse_time(hit_at)
+        with self.lock:
+            cursor = parse_time(self.state["history_cursors"].get(rule_id))
+            existing = next((event for event in self.state["history"] if event["rule_id"] == rule_id and event["hit_at"] == hit_at), None)
+            if not cursor or (hit_time and hit_time > cursor):
+                self.state["history"].append({
+                    "rule_id": rule_id,
+                    "rule_name": rule["name"],
+                    "hit_at": hit_at,
+                    "checked_at": checked_at,
+                    "domain": hit.get("question", {}).get("name", "?"),
+                    "count": count,
+                    "threshold": threshold,
+                    "push_status": push_status,
+                    "push_sent_at": checked_at if push_status == "sent" else None,
+                })
+                self.state["history_cursors"][rule_id] = hit_at
+            elif existing:
+                existing["checked_at"] = checked_at
+                existing["count"] = count
+                existing["threshold"] = threshold
+                if push_status == "sent":
+                    existing["push_status"] = "sent"
+                    existing["push_sent_at"] = checked_at
+                elif existing["push_status"] != "sent":
+                    existing["push_status"] = push_status
+            self.state["history"].sort(key=lambda event: parse_time(event["hit_at"]) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            self.state["history"] = self.state["history"][:100]
+            self.save_state()
 
     def public_config(self):
         with self.lock:
@@ -245,8 +282,12 @@ def evaluate(notify=False):
         threshold = int(rule.get("min_occurrences", 1))
         result = {"id": rule["id"], "name": rule["name"], "count": len(hits), "threshold": threshold, "matched": len(hits) >= threshold, "samples": hits[:5]}
         results.append(result)
+        push_status = "below_threshold"
         if notify and result["matched"]:
-            maybe_notify(rule, result)
+            push_status = maybe_notify(rule, result)
+        if notify and hits:
+            latest_hit = max(hits, key=lambda entry: parse_time(entry.get("time")) or datetime.min.replace(tzinfo=timezone.utc))
+            STORE.record_history(rule, latest_hit, len(hits), threshold, current.isoformat(), push_status)
     with STORE.lock:
         STORE.state["last_run"] = current.isoformat()
         STORE.state["last_error"] = None
@@ -278,19 +319,25 @@ def maybe_notify(rule, result):
         last_event = parse_time(STORE.state["notifications"].get(rule["id"]))
     current = now_utc()
     title, message = notification_text(rule, result)
+    push_status = "cooldown"
     if not last_pushover or current - last_pushover >= timedelta(minutes=cooldown):
         try:
             if send_pushover(title, message, rule):
+                push_status = "sent"
                 with STORE.lock:
                     STORE.state["pushover_notifications"][rule["id"]] = now_utc().isoformat()
                     STORE.save_state()
+            else:
+                push_status = "not_configured"
         except RuntimeError as error:
+            push_status = "failed"
             LOG.error("Pushover-Benachrichtigung fehlgeschlagen: %s", error)
     if not last_event or current - last_event >= timedelta(minutes=cooldown):
         if send_home_assistant_event(rule, result):
             with STORE.lock:
                 STORE.state["notifications"][rule["id"]] = now_utc().isoformat()
                 STORE.save_state()
+    return push_status
 
 
 def send_pushover(title, message, rule=None, required=False):

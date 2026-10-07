@@ -7,6 +7,7 @@ const toast = (message) => { const node = document.querySelector('#toast'); node
 const request = async (url, options = {}) => { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Anfrage fehlgeschlagen'); return data; };
 const setRuleCount = () => { const count = ruleList.children.length; document.querySelector('#rule-count').textContent = `${count} ${count === 1 ? 'Regel' : 'Regeln'}`; document.querySelector('#add-first-rule').hidden = count > 0; };
 const themeToggle = document.querySelector('#theme-toggle');
+const createRuleId = () => globalThis.crypto?.randomUUID?.() || `rule-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -26,7 +27,7 @@ async function withBusy(button, action) {
 
 function addRule(rule = {}) {
   const node = template.content.firstElementChild.cloneNode(true);
-  node.dataset.id = rule.id || crypto.randomUUID();
+  node.dataset.id = rule.id || createRuleId();
   node.querySelector('.rule-name').value = rule.name || '';
   node.querySelector('.rule-toggle-name').textContent = rule.name || 'Neue Regel';
   node.querySelector('.pattern').value = rule.pattern || '';
@@ -71,12 +72,47 @@ function renderResults(results) {
   for (const result of results) { const node = document.createElement('article'); const name = document.createElement('span'); const count = document.createElement('strong'); const threshold = document.createElement('small'); node.className = `result${result.matched ? ' match' : ''}`; name.textContent = result.name; count.append(String(result.count), ' '); threshold.textContent = `/ ${result.threshold}`; count.append(threshold); node.append(name, count); list.append(node); }
 }
 
+function renderHistory(history) {
+  const list = document.querySelector('#history-list');
+  list.replaceChildren();
+  if (!history.length) { const empty = document.createElement('p'); empty.className = 'empty'; empty.textContent = 'Noch keine Treffer vorhanden.'; list.append(empty); return; }
+  const statuses = {
+    sent: ['Push gesendet', 'sent'],
+    failed: ['Versandfehler', 'failed'],
+    not_configured: ['Pushover nicht eingerichtet', 'pending'],
+    cooldown: ['Ruhezeit aktiv', 'pending'],
+    below_threshold: ['Schwelle nicht erreicht', 'pending'],
+  };
+  for (const event of history) {
+    const row = document.createElement('article');
+    const details = document.createElement('div');
+    const name = document.createElement('strong');
+    const description = document.createElement('span');
+    const time = document.createElement('time');
+    const push = document.createElement('span');
+    const [label, state] = statuses[event.push_status] || ['Unbekannter Status', 'pending'];
+    row.className = 'history-item';
+    name.textContent = event.rule_name;
+    description.textContent = `${event.domain} · ${event.count} Treffer (Schwelle ${event.threshold})`;
+    time.dateTime = event.hit_at;
+    time.textContent = new Date(event.hit_at).toLocaleString('de-DE');
+    push.className = `push-status ${state}`;
+    push.textContent = label;
+    if (event.push_status === 'sent' && event.push_sent_at) push.title = `Gesendet: ${new Date(event.push_sent_at).toLocaleString('de-DE')}`;
+    details.className = 'history-details';
+    details.append(name, description);
+    row.append(time, details, push);
+    list.append(row);
+  }
+}
+
 async function refreshStatus() {
   const status = await request('api/status');
   document.querySelector('#last-run').textContent = status.last_run ? new Date(status.last_run).toLocaleString('de-DE') : 'Noch nie';
   document.querySelector('#result-time').textContent = status.last_run ? `Stand: ${new Date(status.last_run).toLocaleString('de-DE')}` : '';
   document.querySelector('#last-error').textContent = status.last_error || 'Keine';
   renderResults(status.last_results || []);
+  renderHistory(status.history || []);
 }
 
 async function initialize() {
