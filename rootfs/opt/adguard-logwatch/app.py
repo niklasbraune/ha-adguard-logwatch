@@ -59,7 +59,7 @@ class Store:
     def __init__(self):
         self.lock = threading.Lock()
         self.config = DEFAULT_CONFIG.copy()
-        self.state = {"last_run": None, "last_error": None, "last_results": [], "notifications": {}}
+        self.state = {"last_run": None, "last_error": None, "last_results": [], "notifications": {}, "pushover_notifications": {}}
         self.load()
 
     def load(self):
@@ -81,12 +81,16 @@ class Store:
             try:
                 saved = json.loads(STATE_PATH.read_text(encoding="utf-8"))
                 self.state["notifications"] = saved.get("notifications", {})
+                self.state["pushover_notifications"] = saved.get("pushover_notifications", {})
             except (OSError, json.JSONDecodeError):
                 LOG.warning("Benachrichtigungsstatus konnte nicht geladen werden")
 
     def save_state(self):
         temporary_path = STATE_PATH.with_suffix(".tmp")
-        temporary_path.write_text(json.dumps({"notifications": self.state["notifications"]}), encoding="utf-8")
+        temporary_path.write_text(json.dumps({
+            "notifications": self.state["notifications"],
+            "pushover_notifications": self.state["pushover_notifications"],
+        }), encoding="utf-8")
         temporary_path.replace(STATE_PATH)
 
     def public_config(self):
@@ -270,21 +274,23 @@ def notification_text(rule, result):
 def maybe_notify(rule, result):
     cooldown = int(rule.get("cooldown_minutes", 60))
     with STORE.lock:
-        last = parse_time(STORE.state["notifications"].get(rule["id"]))
-    if last and now_utc() - last < timedelta(minutes=cooldown):
-        return
+        last_pushover = parse_time(STORE.state["pushover_notifications"].get(rule["id"]))
+        last_event = parse_time(STORE.state["notifications"].get(rule["id"]))
+    current = now_utc()
     title, message = notification_text(rule, result)
-    delivered = False
-    try:
-        delivered = send_pushover(title, message, rule) or delivered
-    except RuntimeError as error:
-        LOG.error("Pushover-Benachrichtigung fehlgeschlagen: %s", error)
-    delivered = send_home_assistant_event(rule, result) or delivered
-    if not delivered:
-        return
-    with STORE.lock:
-        STORE.state["notifications"][rule["id"]] = now_utc().isoformat()
-        STORE.save_state()
+    if not last_pushover or current - last_pushover >= timedelta(minutes=cooldown):
+        try:
+            if send_pushover(title, message, rule):
+                with STORE.lock:
+                    STORE.state["pushover_notifications"][rule["id"]] = now_utc().isoformat()
+                    STORE.save_state()
+        except RuntimeError as error:
+            LOG.error("Pushover-Benachrichtigung fehlgeschlagen: %s", error)
+    if not last_event or current - last_event >= timedelta(minutes=cooldown):
+        if send_home_assistant_event(rule, result):
+            with STORE.lock:
+                STORE.state["notifications"][rule["id"]] = now_utc().isoformat()
+                STORE.save_state()
 
 
 def send_pushover(title, message, rule=None, required=False):

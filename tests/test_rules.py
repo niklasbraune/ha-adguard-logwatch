@@ -140,6 +140,16 @@ class RuleEvaluationTests(unittest.TestCase):
             self.app.maybe_notify(rule, result)
         pushover.assert_called_once()
 
+    def test_failed_pushover_is_retried_when_home_assistant_event_succeeds(self):
+        self.app.STORE = self.app.Store()
+        rule = {"id": "retry", "name": "Retry", "period_minutes": 60, "cooldown_minutes": 60}
+        result = {"count": 1, "threshold": 1, "samples": []}
+        with patch.object(self.app, "send_pushover", side_effect=[RuntimeError("offline"), True]) as pushover, patch.object(self.app, "send_home_assistant_event", return_value=True) as event:
+            self.app.maybe_notify(rule, result)
+            self.app.maybe_notify(rule, result)
+        self.assertEqual(pushover.call_count, 2)
+        event.assert_called_once()
+
 
 class ApiTests(unittest.TestCase):
     app = APP
